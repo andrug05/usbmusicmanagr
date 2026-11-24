@@ -13,7 +13,6 @@ const MUTED = '#91a2b5';
 const BLUE = '#58b6ff';
 const GREEN = '#5de0a1';
 const YELLOW = '#ffd166';
-const RED = '#ff6570';
 
 mgu.run({
     async start(ctx) {
@@ -24,11 +23,11 @@ mgu.run({
         let selected = 0;
         let details = false;
         let busy = false;
-        let status = 'Подключите USB-накопитель и нажмите Scan USB';
+        let status = 'Подключите USB и нажмите «Scan USB»';
         let scannedAt = '';
 
         function safeText(value, max) {
-            let s = String(value || '');
+            let s = String(value == null ? '' : value);
             if (s.length > max) s = s.slice(0, max - 1) + '…';
             return s;
         }
@@ -57,8 +56,8 @@ mgu.run({
             }
 
             if (!tracks.length && !busy) {
-                cv.text('USB-накопитель не найден или MP3-файлы отсутствуют', 60, 220, 22, MUTED, {font:'label', literal:true});
-                cv.text('Поддерживаются только файлы .mp3. Содержимое накопителя не изменяется.', 60, 260, 17, MUTED, {font:'label', literal:true});
+                cv.text('Нажмите Scan USB для поиска музыкальных файлов', 60, 220, 22, MUTED, {font:'label', literal:true});
+                cv.text('Поддерживаются MP3. Файлы на USB не изменяются.', 60, 260, 17, MUTED, {font:'label', literal:true});
             }
 
             if (details && tracks[selected]) {
@@ -74,7 +73,7 @@ mgu.run({
                 cv.text(safeText(t.path || '', 68), 995, 414, 13, MUTED, {font:'label', literal:true});
             }
 
-            cv.text('READ ONLY  ·  MP3 ONLY  ·  NO COPY / DELETE / TAG WRITES', 48, 490, 13, MUTED, {font:'label', literal:true});
+            cv.text('READ ONLY  ·  MP3 ONLY  ·  NO FILE CHANGES', 48, 490, 13, MUTED, {font:'label', literal:true});
             await ui.image('MAIN_GFX', cv);
         }
 
@@ -89,8 +88,6 @@ mgu.run({
                 tracks = [];
                 volumes.forEach(function(volume) {
                     (volume.tracks || []).forEach(function(track) {
-                        // Artwork is parsed by the ID3 reader but not retained in the first read-only UI
-                        // to keep memory use low on the head unit.
                         delete track.cover;
                         delete track.coverMime;
                         track.mount = volume.volume && volume.volume.mount ? volume.volume.mount : '';
@@ -133,8 +130,9 @@ mgu.run({
             if (name === 'MAIN' && visible) render();
         });
 
+        // Do not perform a synchronous recursive USB scan during process startup:
+        // on large drives this can block OAP before the first frame is displayed.
         await render();
-        await scan();
-        log.info('USB Music Manager 0.1.0 started; read-only USB MP3 browser');
+        log.info('USB Music Manager 0.1.1 started; waiting for user scan request');
     }
 });
