@@ -1,28 +1,28 @@
 # BMW USB Music Manager
 
-A read-only MP3 library scanner for BMW MGU ID7/ID8.
+Standalone read-only MP3 browser for BMW MGU ID7, built with the same BMW MGU App Kit used by the author's BMW Speed Camera Warning project.
 
-## Direct USB access
+## Features in 0.1.x
 
-The scanner uses Node.js built-in `fs` directly. It reads `/proc/mounts`, discovers USB device mounts below `/media/` and `/run/media/`, recursively scans folders, and reads ID3 metadata from MP3 files.
-
-It does not depend on Road Ahead's FileManager, the OAP SDK `fileAccess` module, or a separate filesystem service.
-
-## Current status
-
-- Direct, read-only MP3 scanner implemented.
-- Recursive folder scan.
-- ID3v1 and basic ID3v2 metadata, including embedded APIC artwork.
-- Search UI shell present.
-- OAP UI-to-Node bridge is not yet connected.
-- OAP packaging and deployment are not yet validated on the target MGU.
-
-## USB access permissions
-
-The package requests supplementary group 909 (`mgu_usb`) using `oapAppSettings.startUpGroups`. The actual application process must be checked after deployment.
+- Detects removable USB volumes mounted under `/media/` and `/run/media/`.
+- Recursively scans MP3 files.
+- Reads ID3 metadata (title, artist, album, track, year and genre).
+- Shows a browsable track list and selected-track details on the native MGU RHMI screen.
+- Requests supplementary group 909 (`mgu_usb`) for USB filesystem access.
 
 ## Safety
 
-Only files with the `.mp3` extension are processed. The scanner opens files read-only, does not follow symlinks, and never remounts, writes, renames, moves, or deletes anything on the USB drive.
+This release is read-only. It only scans files with the `.mp3` extension, does not follow symlinks, and never mounts/remounts, writes, renames, copies, moves, or deletes anything on the USB drive. Tag editing, copying and deletion are not included.
 
-See [architecture](docs/architecture.md) and [MGU validation notes](docs/mgu-install.md).
+## Build and release
+
+GitHub Actions checks out `aurelmarius/bmw-games`, stages this app in its MGU App Kit, generates native RHMI resources, builds the `.mgu` and `.tgz` packages, verifies the package structure and publishes a GitHub Release.
+
+The release is not a claim of in-car validation. Test on the target MGU after installation; the direct Node.js filesystem scanner was separately verified on the head unit under the OAP process identity with supplementary group 909.
+
+## Source layout
+
+- `apps/andrug05_usb_music_manager/app.json` — app and RHMI screen specification.
+- `apps/andrug05_usb_music_manager/main.js` — MGU runtime and read-only UI.
+- `javascript/scanner.js` — USB discovery and recursive MP3 scan.
+- `javascript/id3.js` — ID3 metadata parser.

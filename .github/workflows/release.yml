@@ -1,0 +1,154 @@
+name: Build USB Music Manager
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/andrug05_usb_music_manager/**'
+      - 'javascript/**'
+      - '.github/workflows/release.yml'
+      - 'README.md'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: '0.1.0'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: usb-music-manager-release
+  cancel-in-progress: true
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    env:
+      APP_ID: andrug05_usb_music_manager
+      APP_VERSION: ${{ inputs.version || '0.1.0' }}
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v5
+
+      - name: Checkout BMW MGU App Kit
+        uses: actions/checkout@v5
+        with:
+          repository: aurelmarius/bmw-games
+          path: upstream
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Prepare standalone OAP app
+        run: |
+          set -euo pipefail
+          mkdir -p "upstream/apps/$APP_ID"
+          cp "apps/$APP_ID/app.json" "upstream/apps/$APP_ID/app.json"
+          cp "apps/$APP_ID/main.js" "upstream/apps/$APP_ID/main.js"
+          cp javascript/scanner.js javascript/id3.js "upstream/apps/$APP_ID/"
+
+          python3 - <<'PY'
+          import json, os
+          p = f"upstream/apps/{os.environ['APP_ID']}/app.json"
+          with open(p, encoding='utf-8') as f:
+              spec = json.load(f)
+          spec['version'] = os.environ['APP_VERSION']
+          with open(p, 'w', encoding='utf-8') as f:
+              json.dump(spec, f, ensure_ascii=False, indent=2)
+              f.write('\n')
+          PY
+
+          # The USB mount is owned by con_2010:mgu_usb (GID 909) on the target MGU.
+          # Add that supplementary group to the generated OAP package, without changing
+          # any other App Kit defaults.
+          python3 - <<'PY'
+          p = 'upstream/kit/tools/build.py'
+          with open(p, encoding='utf-8') as f:
+              s = f.read()
+          old = "'userLoginRequired': False, 'backgroundPriority': 200, 'someipManifest': 'manifest.json',"
+          new = "'userLoginRequired': False, 'backgroundPriority': 200, 'startUpGroups': [909], 'someipManifest': 'manifest.json',"
+          if s.count(old) != 1:
+              raise SystemExit('Could not safely patch OAP startUpGroups in App Kit build.py')
+          with open(p, 'w', encoding='utf-8') as f:
+              f.write(s.replace(old, new, 1))
+          PY
+
+      - name: Validate JavaScript and app metadata
+        run: |
+          set -euo pipefail
+          node --check "upstream/apps/$APP_ID/main.js"
+          node --check "upstream/apps/$APP_ID/scanner.js"
+          node --check "upstream/apps/$APP_ID/id3.js"
+          python3 - <<'PY'
+          import json, os
+          p = f"upstream/apps/{os.environ['APP_ID']}/app.json"
+          d = json.load(open(p, encoding='utf-8'))
+          assert d['id'] == os.environ['APP_ID']
+          assert d['version'] == os.environ['APP_VERSION']
+          assert d['screens'][0]['name'] == 'MAIN'
+          print('Validated', d['id'], d['version'])
+          PY
+
+      - name: Build MGU packages
+        run: |
+          set -euo pipefail
+          cd upstream
+          python3 kit/tools/build.py "$APP_ID"
+          test -s "dist/$APP_ID@$APP_VERSION.mgu"
+          test -s "dist/$APP_ID@$APP_VERSION.tgz"
+          mkdir -p ../release
+          cp "dist/$APP_ID@$APP_VERSION.mgu" ../release/
+          cp "dist/$APP_ID@$APP_VERSION.tgz" ../release/
+          cd ..
+
+      - name: Verify install package
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, tarfile
+          app = os.environ['APP_ID']
+          ver = os.environ['APP_VERSION']
+          pkg = f"release/{app}@{ver}.tgz"
+          with tarfile.open(pkg, 'r:gz') as tf:
+              names = tf.getnames()
+              member = next((n for n in names if n.endswith('/package.json')), None)
+              if not member:
+                  raise SystemExit('package.json missing')
+              data = json.load(tf.extractfile(member))
+              if data.get('oapAppSettings', {}).get('startUpGroups') != [909]:
+                  raise SystemExit('USB supplementary group 909 missing')
+              for required in ('app.js', 'scanner.js', 'id3.js', 'kit/mgu.js'):
+                  if not any(n.endswith('/javascript/' + required) for n in names):
+                      raise SystemExit(required + ' missing from package')
+          with tarfile.open(f"release/{app}@{ver}.mgu", 'r:gz') as tf:
+              names = tf.getnames()
+              if not any(n.endswith('rhmiData/application.json') for n in names):
+                  raise SystemExit('RHMI application descriptor missing')
+              if not any(n.endswith('rhmiData/uiDescription/uiDescription.json') for n in names):
+                  raise SystemExit('RHMI UI description missing')
+          print('MGU and npm packages passed structural checks')
+          PY
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="$APP_ID@$APP_VERSION"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "release/$APP_ID@$APP_VERSION.mgu" "release/$APP_ID@$APP_VERSION.tgz" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" "release/$APP_ID@$APP_VERSION.mgu" "release/$APP_ID@$APP_VERSION.tgz" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "USB Music Manager $APP_VERSION" \
+              --notes "Standalone BMW MGU ID7 OAP app. Read-only MP3 scanner, ID3 metadata browser, USB access through supplementary group 909. No file writes, copies or deletions. Built with the BMW MGU App Kit."
+          fi
