@@ -1,24 +1,24 @@
 # BMW USB Music Manager
 
-Standalone read-only MP3 browser for BMW MGU ID7, built with the same BMW MGU App Kit used by the author's BMW Speed Camera Warning project.
+Standalone read-only MP3 browser for BMW MGU ID7, built with the BMW MGU App Kit.
 
 ## Features in 0.1.x
 
 - Detects removable USB volumes mounted under `/media/` and `/run/media/`.
-- Recursively scans MP3 files.
+- Recursively scans MP3 files only after the user presses **Scan USB**.
 - Reads ID3 metadata (title, artist, album, track, year and genre).
 - Shows a browsable track list and selected-track details on the native MGU RHMI screen.
 - Requests supplementary group 909 (`mgu_usb`) for USB filesystem access.
 
-## Safety
+## Important: read-only
 
-This release is read-only. It only scans files with the `.mp3` extension, does not follow symlinks, and never mounts/remounts, writes, renames, copies, moves, or deletes anything on the USB drive. Tag editing, copying and deletion are not included.
+This release only reads files with the `.mp3` extension, does not follow symlinks, and never mounts/remounts, writes, renames, copies, moves, or deletes anything on the USB drive. Tag editing, copying and deletion are not included.
 
 ## Build and release
 
 GitHub Actions checks out `aurelmarius/bmw-games`, stages this app in its MGU App Kit, generates native RHMI resources, builds the `.mgu` and `.tgz` packages, verifies the package structure and publishes a GitHub Release.
 
-The release is not a claim of in-car validation. Test on the target MGU after installation; the direct Node.js filesystem scanner was separately verified on the head unit under the OAP process identity with supplementary group 909.
+The app now renders its first screen before scanning. This avoids a synchronous recursive scan blocking OAP process startup on large USB drives. The release is not a claim of in-car validation; test on the target MGU after installation.
 
 ## Source layout
 
