@@ -1,22 +1,28 @@
 # BMW USB Music Manager
 
-A read-only USB music library browser for BMW MGU ID7/ID8.
+A read-only MP3 library scanner for BMW MGU ID7/ID8.
 
-## Status
+## Direct USB access
 
-Early development. The first milestone is safe USB discovery and MP3 metadata scanning. No files are modified on the USB device.
+The scanner uses Node.js built-in `fs` directly. It reads `/proc/mounts`, discovers USB device mounts below `/media/` and `/run/media/`, recursively scans folders, and reads ID3 metadata from MP3 files.
 
-## Target environment
+It does not depend on Road Ahead's FileManager, the OAP SDK `fileAccess` module, or a separate filesystem service.
 
-- BMW MGU ID7 / ID8
-- Node.js 8.16 compatible runtime
-- USB volumes discovered dynamically from `/proc/mounts`
-- Initial metadata support: MP3 ID3v1 and ID3v2
+## Current status
+
+- Direct, read-only MP3 scanner implemented.
+- Recursive folder scan.
+- ID3v1 and basic ID3v2 metadata, including embedded APIC artwork.
+- Search UI shell present.
+- OAP UI-to-Node bridge is not yet connected.
+- OAP packaging and deployment are not yet validated on the target MGU.
+
+## USB access permissions
+
+The package requests supplementary group 909 (`mgu_usb`) using `oapAppSettings.startUpGroups`. The actual application process must be checked after deployment.
 
 ## Safety
 
-The scanner is read-only. It does not remount volumes, write test files, rename, move, or delete media.
+Only files with the `.mp3` extension are processed. The scanner opens files read-only, does not follow symlinks, and never remounts, writes, renames, moves, or deletes anything on the USB drive.
 
-## Development
-
-See `docs/architecture.md` and `docs/mgu-install.md` for the initial design and deployment notes.
+See [architecture](docs/architecture.md) and [MGU validation notes](docs/mgu-install.md).
