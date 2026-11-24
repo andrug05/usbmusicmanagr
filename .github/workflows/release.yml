@@ -6,6 +6,8 @@ on:
     paths:
       - 'apps/andrug05_usb_music_manager/**'
       - 'javascript/**'
+      - 'component.json'
+      - 'manifest.json'
       - '.github/workflows/release.yml'
       - 'README.md'
   workflow_dispatch:
@@ -13,7 +15,7 @@ on:
       version:
         description: 'Release version'
         required: true
-        default: '0.1.0'
+        default: '0.1.1'
 
 permissions:
   contents: write
@@ -27,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APP_ID: andrug05_usb_music_manager
-      APP_VERSION: ${{ inputs.version || '0.1.0' }}
+      APP_VERSION: ${{ inputs.version || '0.1.1' }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v5
@@ -67,9 +69,7 @@ jobs:
               f.write('\n')
           PY
 
-          # The USB mount is owned by con_2010:mgu_usb (GID 909) on the target MGU.
-          # Add that supplementary group to the generated OAP package, without changing
-          # any other App Kit defaults.
+          # The OAP app process needs the USB supplementary group (GID 909).
           python3 - <<'PY'
           p = 'upstream/kit/tools/build.py'
           with open(p, encoding='utf-8') as f:
@@ -150,5 +150,5 @@ jobs:
             gh release create "$TAG" "release/$APP_ID@$APP_VERSION.mgu" "release/$APP_ID@$APP_VERSION.tgz" \
               --repo "$GITHUB_REPOSITORY" \
               --title "USB Music Manager $APP_VERSION" \
-              --notes "Standalone BMW MGU ID7 OAP app. Read-only MP3 scanner, ID3 metadata browser, USB access through supplementary group 909. No file writes, copies or deletions. Built with the BMW MGU App Kit."
+              --notes "Standalone BMW MGU ID7 OAP app. Read-only MP3 scanner and ID3 metadata browser. First screen is rendered before USB scanning; USB supplementary group 909 is requested. No file writes, copies or deletions. Built with the BMW MGU App Kit."
           fi
