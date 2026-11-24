@@ -118,7 +118,7 @@ mgu.run({
                 const truncated = volumes.some(function(v) { return v.truncated; });
                 status = truncated
                     ? 'Сканирование завершено: достигнут лимит, найдено MP3: ' + tracks.length
-                    : (tracks.length ? 'Сканирование завершено' : 'USB найден, MP3 не обнаружены');
+                    : (tracks.length ? 'Сканирование завершено' : 'USB найден, MP3 не обнаружены · просмотрено: ' + volumes.reduce(function(n, v) { return n + (v.entries || 0); }, 0) + ' · ошибок: ' + volumes.reduce(function(n, v) { return n + (v.skipped || 0); }, 0));
                 log.info('USB scan complete: ' + volumes.length + ' volumes, ' + tracks.length + ' MP3');
             } catch (e) {
                 tracks = [];
