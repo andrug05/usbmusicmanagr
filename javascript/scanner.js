@@ -11,7 +11,7 @@ var DEFAULT_MAX_ENTRIES = 50000;
 var MAX_TAG_BYTES = 256 * 1024;
 
 function unescapeMount(value) {
-  return value.replace(/\\\\([0-7]{3})/g, function(_, octal) {
+  return value.replace(/\\([0-7]{3})/g, function(_, octal) {
     return String.fromCharCode(parseInt(octal, 8));
   });
 }
