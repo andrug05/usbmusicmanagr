@@ -22,7 +22,7 @@ function readMounts(mountsFile) {
   var volumes = [];
   rows.forEach(function(line) {
     if (!line) return;
-    var fields = line.trim().split(/\\s+/);
+    var fields = line.trim().split(/\s+/);
     if (fields.length < 4) return;
     var device = unescapeMount(fields[0]);
     var mount = unescapeMount(fields[1]);
