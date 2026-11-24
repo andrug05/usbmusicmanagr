@@ -80,16 +80,30 @@ mgu.run({
         async function scan() {
             if (busy) return;
             busy = true;
-            status = 'Сканирование USB…';
+            tracks = [];
+            selected = 0;
+            details = false;
+            status = 'Подготовка сканирования USB…';
             await render();
             try {
-                const result = scanner.scanAll({maxFiles:20000, maxDepth:24});
+                const result = await scanner.scanAllAsync({
+                    maxFiles: 5000,
+                    maxDepth: 16,
+                    maxEntries: 50000,
+                    onProgress: function(progress) {
+                        status = 'Сканирование… MP3: ' + progress.files +
+                            ' · просмотрено: ' + progress.entries;
+                        if (progress.entries > 0 && progress.entries % 500 === 0) {
+                            render().catch(function(error) {
+                                log.error('Progress render failed: ' + error);
+                            });
+                        }
+                    }
+                });
                 volumes = result.volumes || [];
                 tracks = [];
                 volumes.forEach(function(volume) {
                     (volume.tracks || []).forEach(function(track) {
-                        delete track.cover;
-                        delete track.coverMime;
                         track.mount = volume.volume && volume.volume.mount ? volume.volume.mount : '';
                         tracks.push(track);
                     });
@@ -101,16 +115,20 @@ mgu.run({
                 });
                 selected = 0;
                 scannedAt = new Date().toLocaleTimeString();
-                status = tracks.length ? 'Сканирование завершено' : 'USB найден, MP3 не обнаружены';
+                const truncated = volumes.some(function(v) { return v.truncated; });
+                status = truncated
+                    ? 'Сканирование завершено: достигнут лимит, найдено MP3: ' + tracks.length
+                    : (tracks.length ? 'Сканирование завершено' : 'USB найден, MP3 не обнаружены');
                 log.info('USB scan complete: ' + volumes.length + ' volumes, ' + tracks.length + ' MP3');
             } catch (e) {
                 tracks = [];
                 volumes = [];
                 status = 'Ошибка сканирования: ' + safeText(e && e.message ? e.message : e, 80);
                 log.error('USB scan failed: ' + (e && e.stack ? e.stack : e));
+            } finally {
+                busy = false;
+                await render();
             }
-            busy = false;
-            await render();
         }
 
         ui.onClick('BTN_SCAN', scan);
@@ -133,6 +151,6 @@ mgu.run({
         // Do not perform a synchronous recursive USB scan during process startup:
         // on large drives this can block OAP before the first frame is displayed.
         await render();
-        log.info('USB Music Manager 0.1.1 started; waiting for user scan request');
+        log.info('USB Music Manager 0.1.3 started; waiting for user scan request');
     }
 });
