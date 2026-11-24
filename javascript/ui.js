@@ -1,0 +1,9 @@
+'use strict';
+(function(){
+ var tracks=[], button=document.getElementById('scan'), status=document.getElementById('status'), search=document.getElementById('search'), host=document.getElementById('tracks');
+ function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+ function render(){var q=search.value.toLowerCase(), shown=tracks.filter(function(t){return [t.title,t.artist,t.album,t.name].join(' ').toLowerCase().indexOf(q)!==-1;});if(!shown.length){host.innerHTML='<div class="empty">Ничего не найдено</div>';return;}host.innerHTML=shown.map(function(t){return '<div class="track"><span class="song">'+esc(t.title||t.name)+'</span><span>'+esc(t.artist||'—')+'</span><span>'+esc(t.album||'—')+'</span><span class="filename">'+esc(t.name)+'</span></div>';}).join('');}
+ function show(data){tracks=[];(data.volumes||[]).forEach(function(v){tracks=tracks.concat(v.tracks||[]);});document.getElementById('trackCount').textContent=tracks.length;document.getElementById('volumeCount').textContent=(data.volumes||[]).length;var a={};tracks.forEach(function(t){if(t.artist)a[t.artist]=true;});document.getElementById('artistCount').textContent=Object.keys(a).length;status.textContent='Сканирование завершено · '+new Date(data.scannedAt).toLocaleString();render();}
+ button.addEventListener('click',function(){status.textContent='Ожидание подключения сканера MGU…';if(window.UsbMusicManager&&typeof window.UsbMusicManager.scan==='function'){button.disabled=true;window.UsbMusicManager.scan(function(err,data){button.disabled=false;if(err){status.textContent='Ошибка: '+err.message;return;}show(data);});}else{status.textContent='Интерфейс готов. OAP filesystem bridge ещё не подключён.';}});
+ search.addEventListener('input',render);
+})();
