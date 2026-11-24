@@ -1,1 +1,7 @@
-{"id":"andrug05-usb-music-manager","name":"USB Music Manager","version":"0.1.0","description":"Read-only MP3 browser using direct Node.js filesystem access","main":"index.html"}
+{
+  "id": "andrug05_usb_music_manager",
+  "name": "USB Music Manager",
+  "version": "0.1.1",
+  "description": "Read-only MP3 browser using direct Node.js filesystem access",
+  "main": "index.html"
+}
