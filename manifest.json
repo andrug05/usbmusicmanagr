@@ -1,0 +1,1 @@
+{"id":"andrug05-usb-music-manager","name":"USB Music Manager","version":"0.1.0","description":"Browse music on connected USB storage","main":"index.html","permissions":["filesystem.read","usb.read"]}
