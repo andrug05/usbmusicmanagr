@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>USB Music Manager</title><link rel="stylesheet" href="css/app.css"></head>
+<body><main class="app">
+<header class="topbar"><div class="brand"><span class="mark">♫</span><div><strong>USB Music Manager</strong><small>BMW MGU · ID7 / ID8</small></div></div><span class="mode">READ ONLY</span></header>
+<section class="toolbar"><div><h1>Музыкальная библиотека</h1><p id="status">Подключите USB-накопитель для сканирования</p></div><button id="scan" type="button">Сканировать USB</button></section>
+<section class="stats"><div><b id="trackCount">—</b><span>Треков</span></div><div><b id="volumeCount">—</b><span>Накопителей</span></div><div><b id="artistCount">—</b><span>Исполнителей</span></div></section>
+<section class="library"><aside><label for="search">Поиск</label><input id="search" type="search" placeholder="Трек, исполнитель, альбом"><label for="filter">Фильтр</label><select id="filter"><option value="all">Все треки</option><option value="artist">По исполнителю</option><option value="album">По альбому</option></select><div class="notice">На этом этапе приложение только читает USB. Изменение файлов отключено.</div></aside>
+<div class="tracks"><div class="table-head"><span>Название</span><span>Исполнитель</span><span>Альбом</span><span>Файл</span></div><div id="tracks"><div class="empty">Библиотека ещё не загружена</div></div></div></section>
+<footer>USB Music Manager 0.1.0 · Безопасный режим чтения</footer></main><script src="javascript/ui.js"></script></body></html>
