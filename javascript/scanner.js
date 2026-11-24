@@ -18,7 +18,7 @@ function unescapeMount(value) {
 
 function readMounts(mountsFile) {
   var content = fs.readFileSync(mountsFile || '/proc/mounts', 'utf8');
-  var rows = content.split(/\\r?\\n/);
+  var rows = content.split(/\r?\n/);
   var volumes = [];
   rows.forEach(function(line) {
     if (!line) return;
