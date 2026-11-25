@@ -33,3 +33,8 @@ The app now renders its first screen before scanning. This avoids a synchronous 
 ## 0.1.8 memory fix
 
 The ID3 parser records only the artwork MIME type and a boolean presence flag. It does not Base64-encode or retain cover images while scanning, preventing memory growth across large USB libraries.
+
+
+## 0.1.9 Russian ID3 decoding
+
+Legacy ID3 text stored in Windows-1251 (including ID3v1 tags) is decoded as Cyrillic. UTF-16 ID3 text now handles both little-endian and big-endian BOMs and trims only complete UTF-16 null terminators.
