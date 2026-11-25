@@ -89,7 +89,7 @@ mgu.run({
                 cv.text('Album: ' + safeText(t.album || '—', 45), 995, 266, 16, MUTED, {font:'label', literal:true});
                 cv.text('Track: ' + safeText(t.track || '—', 15) + '   Year: ' + safeText(t.year || '—', 10), 995, 300, 16, MUTED, {font:'label', literal:true});
                 cv.text('Genre: ' + safeText(t.genre || '—', 35), 995, 334, 16, MUTED, {font:'label', literal:true});
-                cv.text('Обложка: ' + (t.cover ? 'встроена' : 'нет'), 995, 368, 16, MUTED, {font:'label', literal:true});
+                cv.text('Обложка: ' + (t.hasCover ? 'встроена' : 'нет'), 995, 368, 16, MUTED, {font:'label', literal:true});
                 cv.text('Size: ' + (Math.round((t.size || 0) / 1024 / 1024 * 10) / 10) + ' MB', 995, 402, 16, MUTED, {font:'label', literal:true});
                 cv.text(safeText(t.path || '', 68), 995, 438, 13, MUTED, {font:'label', literal:true});
             }
@@ -174,6 +174,6 @@ mgu.run({
         // Do not perform a synchronous recursive USB scan during process startup:
         // on large drives this can block OAP before the first frame is displayed.
         await render();
-        log.info('USB Music Manager 0.1.7 started; waiting for user scan request');
+        log.info('USB Music Manager 0.1.8 started; waiting for user scan request');
     }
 });
