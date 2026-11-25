@@ -1,6 +1,6 @@
 {
   "name": "oap-usb-music-manager",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Read-only USB music library manager for BMW MGU ID7",
   "main": "javascript/runner.js",
   "productName": "USB Music Manager",
