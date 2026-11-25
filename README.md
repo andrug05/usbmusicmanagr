@@ -38,3 +38,8 @@ The ID3 parser records only the artwork MIME type and a boolean presence flag. I
 ## 0.1.9 Russian ID3 decoding
 
 Legacy ID3 text stored in Windows-1251 (including ID3v1 tags) is decoded as Cyrillic. UTF-16 ID3 text now handles both little-endian and big-endian BOMs and trims only complete UTF-16 null terminators.
+
+
+## 0.1.10 adaptive ID3 text decoding
+
+For legacy ID3 encoding-0 frames, UTF-8 is accepted only when it round-trips byte-for-byte; otherwise bytes are decoded as Windows-1251. UTF-16LE without a BOM is handled as little-endian for common non-conforming tags.
