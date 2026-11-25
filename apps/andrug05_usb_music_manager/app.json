@@ -2,7 +2,7 @@
   "id": "andrug05_usb_music_manager",
   "title": "USB Music Manager",
   "description": "Read-only USB MP3 browser for BMW MGU ID7. Scans removable USB volumes and reads ID3 metadata.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "vendor": "Andrug05",
   "loggingId": "UMM1",
   "iconGlyph": "music",
@@ -15,10 +15,26 @@
       "kind": "canvas",
       "title": "USB Music Manager",
       "buttons": [
-        ["BTN_SCAN", "Scan USB"],
-        ["BTN_PREV", "Previous"],
-        ["BTN_NEXT", "Next"],
-        ["BTN_INFO", "Details"]
+        [
+          "BTN_SCAN",
+          "Scan USB"
+        ],
+        [
+          "BTN_PREV",
+          "Previous"
+        ],
+        [
+          "BTN_NEXT",
+          "Next"
+        ],
+        [
+          "BTN_INFO",
+          "Details"
+        ],
+        [
+          "BTN_SORT",
+          "Sort"
+        ]
       ]
     }
   ]
