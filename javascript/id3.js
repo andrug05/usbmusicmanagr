@@ -34,9 +34,15 @@ function decodeText(frame) {
   if (!frame || !frame.length) return '';
   var enc = frame[0], data = frame.slice(1);
   try {
-    if (enc === 0) return decodeCP1251(data).replace(/\u0000/g, '').trim();
+    if (enc === 0) {
+      // Legacy files sometimes store UTF-8 or CP1251 while declaring encoding 0.
+      // Accept UTF-8 only if decoding and re-encoding preserves every byte.
+      var utf8 = data.toString('utf8');
+      if (Buffer.from(utf8, 'utf8').equals(data)) return utf8.replace(/\u0000/g, '').trim();
+      return decodeCP1251(data).replace(/\u0000/g, '').trim();
+    }
     if (enc === 3) return data.toString('utf8').replace(/\u0000/g, '').trim();
-    if (enc === 1) return decodeUTF16(data, false);
+    if (enc === 1) return decodeUTF16(data, true);
     if (enc === 2) return decodeUTF16(data, false);
   } catch (e) {}
   return '';
