@@ -112,7 +112,7 @@ function scanVolumeAsync(volume, options) {
                 title:tags.title || path.basename(name, path.extname(name)),
                 artist:tags.artist || '', album:tags.album || '',
                 track:tags.track || '', year:tags.year || '', genre:tags.genre || '',
-                coverMime:tags.coverMime || '', cover:tags.cover || null
+                coverMime:tags.coverMime || '', hasCover:!!tags.hasCover
               });
               if (tracks.length % 25 === 0) notify();
             });
