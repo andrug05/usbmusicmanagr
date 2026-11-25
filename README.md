@@ -8,6 +8,8 @@ Standalone read-only MP3 browser for BMW MGU ID7, built with the BMW MGU App Kit
 - Recursively scans MP3 files only after the user presses **Scan USB**.
 - Reads ID3 metadata (title, artist, album, track, year and genre).
 - Shows a browsable track list and selected-track details on the native MGU RHMI screen.
+- Sorts tracks by path, title, artist or album using the **Sort** control.
+- Preserves embedded ID3 album artwork metadata and reports whether a track contains a cover.
 - Requests supplementary group 909 (`mgu_usb`) for USB filesystem access.
 
 ## Important: read-only
