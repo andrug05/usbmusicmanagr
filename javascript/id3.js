@@ -1,22 +1,43 @@
 'use strict';
+
+// ID3 encoding 0 is formally ISO-8859-1, but many Russian MP3 files
+// store Windows-1251 bytes there. Decode the upper half as CP1251 so
+// legacy Russian titles remain readable on Node versions without iconv.
+var CP1251 = 'ЂЃ‚ѓ„…†‡€‰Љ‹ЊЌЋЏђ‘’“”•–—�™љ›њќћџ ЎўЈ¤Ґ¦§Ё©Є«¬­®Ї°±Ііґµ¶·ё№є»јЅѕїАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя';
+
+function decodeCP1251(data) {
+  var out = '';
+  for (var i = 0; i < data.length; i++) {
+    var b = data[i];
+    out += b < 128 ? String.fromCharCode(b) : CP1251.charAt(b - 128);
+  }
+  return out;
+}
+
+function decodeUTF16(data, little) {
+  var start = 0;
+  if (data.length >= 2) {
+    if (data[0] === 255 && data[1] === 254) { little = true; start = 2; }
+    else if (data[0] === 254 && data[1] === 255) { little = false; start = 2; }
+  }
+  var end = data.length;
+  while (end - start >= 2 && data[end - 1] === 0 && data[end - 2] === 0) end -= 2;
+  var out = '';
+  for (var i = start; i + 1 < end; i += 2) {
+    var code = little ? data[i] | (data[i + 1] << 8) : (data[i] << 8) | data[i + 1];
+    if (code) out += String.fromCharCode(code);
+  }
+  return out.replace(/\u0000/g, '').trim();
+}
+
 function decodeText(frame) {
   if (!frame || !frame.length) return '';
-  var enc = frame[0], data = frame.slice(1), end = frame.length - 1;
-  while (end > 0 && (data[end - 1] === 0 || data[end - 1] === 255)) end--;
-  data = data.slice(0, end);
+  var enc = frame[0], data = frame.slice(1);
   try {
-    if (enc === 0) return data.toString('latin1').replace(/\u0000/g, '').trim();
+    if (enc === 0) return decodeCP1251(data).replace(/\u0000/g, '').trim();
     if (enc === 3) return data.toString('utf8').replace(/\u0000/g, '').trim();
-    if (enc === 1 || enc === 2) {
-      var little = enc === 1 && data.length >= 2 && data[0] === 255 && data[1] === 254;
-      if (enc === 1 && data.length >= 2) data = data.slice(2);
-      var out = '';
-      for (var i = 0; i + 1 < data.length; i += 2) {
-        var code = little ? data[i] | (data[i + 1] << 8) : (data[i] << 8) | data[i + 1];
-        out += String.fromCharCode(code);
-      }
-      return out.trim();
-    }
+    if (enc === 1) return decodeUTF16(data, false);
+    if (enc === 2) return decodeUTF16(data, false);
   } catch (e) {}
   return '';
 }
@@ -47,10 +68,10 @@ function parseID3(buffer) {
   }
   if (buffer.length >= 128 && buffer.toString('ascii',buffer.length-128,buffer.length-125) === 'TAG') {
     var o = buffer.length-125;
-    if (!r.title) r.title = buffer.toString('latin1',o,o+30).replace(/\0/g,'').trim();
-    if (!r.artist) r.artist = buffer.toString('latin1',o+30,o+60).replace(/\0/g,'').trim();
-    if (!r.album) r.album = buffer.toString('latin1',o+60,o+90).replace(/\0/g,'').trim();
-    if (!r.year) r.year = buffer.toString('latin1',o+90,o+94).replace(/\0/g,'').trim();
+    if (!r.title) r.title = decodeCP1251(buffer.slice(o,o+30)).replace(/\u0000/g,'').trim();
+    if (!r.artist) r.artist = decodeCP1251(buffer.slice(o+30,o+60)).replace(/\u0000/g,'').trim();
+    if (!r.album) r.album = decodeCP1251(buffer.slice(o+60,o+90)).replace(/\u0000/g,'').trim();
+    if (!r.year) r.year = buffer.toString('latin1',o+90,o+94).replace(/\u0000/g,'').trim();
   }
   return r;
 }
