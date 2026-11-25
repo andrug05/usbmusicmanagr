@@ -22,7 +22,7 @@ function decodeText(frame) {
 }
 function syncSafe(b, o) { return ((b[o] & 127) << 21) | ((b[o+1] & 127) << 14) | ((b[o+2] & 127) << 7) | (b[o+3] & 127); }
 function parseID3(buffer) {
-  var r = {title:'',artist:'',album:'',track:'',year:'',genre:'',coverMime:'',cover:null};
+  var r = {title:'',artist:'',album:'',track:'',year:'',genre:'',coverMime:'',hasCover:false};
   var map = {TIT2:'title',TPE1:'artist',TALB:'album',TRCK:'track',TYER:'year',TDRC:'year',TCON:'genre'};
   if (buffer.length >= 10 && buffer.toString('ascii',0,3) === 'ID3') {
     var ver = buffer[3], pos = 10, limit = 10 + Math.min(syncSafe(buffer,6), buffer.length - 10);
@@ -39,7 +39,7 @@ function parseID3(buffer) {
           var p = me + 2, enc = f[0];
           if (enc === 0 || enc === 3) { while (p < f.length && f[p] !== 0) p++; p++; }
           else { while (p+1 < f.length && (f[p] !== 0 || f[p+1] !== 0)) p += 2; p += 2; }
-          if (p < f.length) { r.coverMime = f.toString('latin1',1,me); r.cover = f.slice(p).toString('base64'); }
+          if (p < f.length) { r.coverMime = f.toString('latin1',1,me); r.hasCover = true; }
         }
       }
       pos += 10 + size;
