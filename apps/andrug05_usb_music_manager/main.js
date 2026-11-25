@@ -25,6 +25,26 @@ mgu.run({
         let busy = false;
         let status = 'Подключите USB и нажмите «Scan USB»';
         let scannedAt = '';
+        let sortMode = 0;
+        const sortModes = [
+            {label:'Путь', field:'path'},
+            {label:'Название', field:'title'},
+            {label:'Исполнитель', field:'artist'},
+            {label:'Альбом', field:'album'}
+        ];
+
+        function sortTracks() {
+            const field = sortModes[sortMode].field;
+            tracks.sort(function(a, b) {
+                const aa = String(a[field] || a.name || '').toLowerCase();
+                const bb = String(b[field] || b.name || '').toLowerCase();
+                if (aa < bb) return -1;
+                if (aa > bb) return 1;
+                const ap = String(a.path || '').toLowerCase();
+                const bp = String(b.path || '').toLowerCase();
+                return ap < bp ? -1 : ap > bp ? 1 : 0;
+            });
+        }
 
         function safeText(value, max) {
             let s = String(value == null ? '' : value);
@@ -42,7 +62,7 @@ mgu.run({
 
             const start = Math.max(0, Math.min(Math.max(0, tracks.length - PAGE_ROWS), selected - Math.floor(PAGE_ROWS / 2)));
             const end = Math.min(tracks.length, start + PAGE_ROWS);
-            cv.text('TRACKS', 48, 125, 15, MUTED, {font:'label', literal:true});
+            cv.text('TRACKS · SORT: ' + sortModes[sortMode].label.toUpperCase(), 48, 125, 15, MUTED, {font:'label', literal:true});
             for (let i = start; i < end; i++) {
                 const t = tracks[i];
                 const y = 145 + (i - start) * 47;
@@ -69,8 +89,9 @@ mgu.run({
                 cv.text('Album: ' + safeText(t.album || '—', 45), 995, 266, 16, MUTED, {font:'label', literal:true});
                 cv.text('Track: ' + safeText(t.track || '—', 15) + '   Year: ' + safeText(t.year || '—', 10), 995, 300, 16, MUTED, {font:'label', literal:true});
                 cv.text('Genre: ' + safeText(t.genre || '—', 35), 995, 334, 16, MUTED, {font:'label', literal:true});
-                cv.text('Size: ' + (Math.round((t.size || 0) / 1024 / 1024 * 10) / 10) + ' MB', 995, 368, 16, MUTED, {font:'label', literal:true});
-                cv.text(safeText(t.path || '', 68), 995, 414, 13, MUTED, {font:'label', literal:true});
+                cv.text('Обложка: ' + (t.cover ? 'встроена' : 'нет'), 995, 368, 16, MUTED, {font:'label', literal:true});
+                cv.text('Size: ' + (Math.round((t.size || 0) / 1024 / 1024 * 10) / 10) + ' MB', 995, 402, 16, MUTED, {font:'label', literal:true});
+                cv.text(safeText(t.path || '', 68), 995, 438, 13, MUTED, {font:'label', literal:true});
             }
 
             cv.text('READ ONLY  ·  MP3 ONLY  ·  NO FILE CHANGES', 48, 490, 13, MUTED, {font:'label', literal:true});
@@ -108,11 +129,7 @@ mgu.run({
                         tracks.push(track);
                     });
                 });
-                tracks.sort(function(a, b) {
-                    const aa = String(a.path || '').toLowerCase();
-                    const bb = String(b.path || '').toLowerCase();
-                    return aa < bb ? -1 : aa > bb ? 1 : 0;
-                });
+                sortTracks();
                 selected = 0;
                 scannedAt = new Date().toLocaleTimeString();
                 const truncated = volumes.some(function(v) { return v.truncated; });
@@ -140,6 +157,12 @@ mgu.run({
             if (tracks.length) selected = (selected + 1) % tracks.length;
             render();
         });
+        ui.onClick('BTN_SORT', function() {
+            sortMode = (sortMode + 1) % sortModes.length;
+            sortTracks();
+            selected = 0;
+            render();
+        });
         ui.onClick('BTN_INFO', function() {
             details = !details;
             render();
@@ -151,6 +174,6 @@ mgu.run({
         // Do not perform a synchronous recursive USB scan during process startup:
         // on large drives this can block OAP before the first frame is displayed.
         await render();
-        log.info('USB Music Manager 0.1.3 started; waiting for user scan request');
+        log.info('USB Music Manager 0.1.7 started; waiting for user scan request');
     }
 });
