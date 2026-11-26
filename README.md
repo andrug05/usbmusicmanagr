@@ -9,6 +9,7 @@ Standalone read-only MP3 browser for BMW MGU ID7, built with the BMW MGU App Kit
 - Reads ID3 metadata (title, artist, album, track, year and genre).
 - Shows a browsable track list and selected-track details on the native MGU RHMI screen.
 - Sorts tracks by path, title, artist or album using the **Sort** control.
+- Browses the library by artists, albums or folders using **View**, then opens a selected group with **Open**.
 - Detects embedded ID3 album artwork and reports whether a track contains a cover, without retaining image bytes in memory.
 - Requests supplementary group 909 (`mgu_usb`) for USB filesystem access.
 
@@ -43,3 +44,8 @@ Legacy ID3 text stored in Windows-1251 (including ID3v1 tags) is decoded as Cyri
 ## 0.1.10 adaptive ID3 text decoding
 
 For legacy ID3 encoding-0 frames, UTF-8 is accepted only when it round-trips byte-for-byte; otherwise bytes are decoded as Windows-1251. UTF-16LE without a BOM is handled as little-endian for common non-conforming tags.
+
+
+## 0.1.11 library browsing
+
+Added grouped browsing by artist, album (artist + album) and folder. Select a group and press Open to show its tracks. View returns to the other library categories. USB access remains read-only.
