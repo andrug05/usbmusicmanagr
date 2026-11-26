@@ -2,6 +2,7 @@
 
 const mgu = require('./kit/mgu');
 const scanner = require('./scanner');
+const filemanager = require('./filemanager');
 
 const W = 1600;
 const H = 520;
@@ -34,6 +35,10 @@ mgu.run({
         let nowSnapshot = null;
         let nowError = '';
         let nowBusy = false;
+        let trashItems = [];
+        let trashMount = '';
+        let trashSelected = 0;
+        let trashStatus = 'Корзина USB';
         const sortModes = [
             {label:'Путь', field:'path'},
             {label:'Название', field:'title'},
@@ -149,6 +154,73 @@ mgu.run({
                 nowBusy = false;
                 await renderNowPlaying();
             }
+        }
+
+        async function loadTrash(mount) {
+            trashMount = mount || trashMount || (volumes[0] && volumes[0].volume && volumes[0].volume.mount) || '';
+            if (!trashMount) { trashItems = []; trashStatus = 'Сначала выполните Scan USB'; return; }
+            try {
+                trashItems = filemanager.listTrash(trashMount);
+                trashStatus = 'В корзине: ' + trashItems.length + ' файлов';
+                trashSelected = Math.max(0, Math.min(trashSelected, trashItems.length - 1));
+            } catch (error) {
+                trashStatus = 'Ошибка корзины: ' + safeText(error.message || error, 80);
+                trashItems = [];
+            }
+        }
+
+        async function renderTrash() {
+            const cv = ctx.canvas(W, H).clear(BG);
+            cv.roundRect(18, 12, W - 36, H - 24, 16, PANEL);
+            cv.text('КОРЗИНА USB', 48, 52, 25, BLUE, {font:'label', literal:true});
+            cv.text(trashStatus, 48, 84, 17, MUTED, {font:'label', literal:true});
+            const start = Math.max(0, Math.min(Math.max(0, trashItems.length - PAGE_ROWS), trashSelected - Math.floor(PAGE_ROWS / 2)));
+            for (let i = start; i < Math.min(trashItems.length, start + PAGE_ROWS); i++) {
+                const item = trashItems[i];
+                const y = 145 + (i - start) * 47;
+                cv.roundRect(38, y - 25, 1480, 40, 7, i === trashSelected ? '#17496a' : '#172431');
+                cv.text(String(i + 1).padStart(3, '0'), 55, y, 15, i === trashSelected ? BLUE : MUTED, {font:'label', literal:true});
+                cv.text(safeText(item.title || item.id, 75), 120, y, 19, TEXT, {font:'label', literal:true});
+                cv.text(safeText(item.originalPath || '', 95), 760, y, 14, MUTED, {font:'label', literal:true});
+            }
+            if (!trashItems.length) cv.text('Корзина пуста', 60, 210, 22, MUTED, {font:'label', literal:true});
+            cv.text('Удаление перемещает MP3 в .umm_trash на этой USB. Restore возвращает файл обратно.', 60, 475, 15, MUTED, {font:'label', literal:true});
+            await ui.image('TRASH_GFX', cv);
+        }
+
+        async function moveSelectedToTrash() {
+            if (busy || viewMode !== 0) { status = 'Удалять в корзину можно из списка треков'; await render(); return; }
+            const list = currentTracks();
+            const track = list[selected];
+            if (!track) return;
+            const mount = track.mount || (volumes[0] && volumes[0].volume && volumes[0].volume.mount);
+            if (!mount) { status = 'Не удалось определить USB-накопитель'; await render(); return; }
+            try {
+                filemanager.moveToTrash(track.path, mount, track.title || track.name);
+                tracks = tracks.filter(function(t) { return t.path !== track.path; });
+                activeFilter = null;
+                selected = Math.max(0, Math.min(selected, tracks.length - 1));
+                buildBrowseItems();
+                status = 'Файл перемещён в корзину USB';
+                log.info('Moved MP3 to USB trash: ' + track.path);
+            } catch (error) {
+                status = 'Ошибка корзины: ' + safeText(error.message || error, 90);
+                log.error('USB trash move failed: ' + (error.stack || error));
+            }
+            await render();
+        }
+
+        async function restoreSelectedFromTrash() {
+            const item = trashItems[trashSelected];
+            if (!item) return;
+            try {
+                filemanager.restoreFromTrash(item, trashMount);
+                trashStatus = 'Файл восстановлен. Выполните Scan USB для обновления списка.';
+                await loadTrash(trashMount);
+            } catch (error) {
+                trashStatus = 'Ошибка восстановления: ' + safeText(error.message || error, 90);
+            }
+            await renderTrash();
         }
 
         async function renderNowPlaying() {
@@ -307,6 +379,15 @@ mgu.run({
 
         ui.onClick('BTN_SCAN', scan);
         ui.onClick('BTN_NOW', function() { ui.open('NOW').then(refreshNowPlaying); });
+        ui.onClick('BTN_DELETE', moveSelectedToTrash);
+        ui.onClick('BTN_TRASH', function() {
+            const mount = volumes[0] && volumes[0].volume && volumes[0].volume.mount;
+            ui.open('TRASH').then(function() { return loadTrash(mount); }).then(renderTrash);
+        });
+        ui.onClick('BTN_TRASH_PREV', function() { if (trashItems.length) trashSelected = (trashSelected - 1 + trashItems.length) % trashItems.length; renderTrash(); });
+        ui.onClick('BTN_TRASH_NEXT', function() { if (trashItems.length) trashSelected = (trashSelected + 1) % trashItems.length; renderTrash(); });
+        ui.onClick('BTN_RESTORE', restoreSelectedFromTrash);
+        ui.onClick('BTN_TRASH_BACK', function() { ui.open('MAIN'); });
         ui.onClick('BTN_NOW_REFRESH', refreshNowPlaying);
         ui.onClick('BTN_NOW_BACK', function() { ui.open('MAIN'); });
         ui.onClick('BTN_PREV', function() {
@@ -350,11 +431,12 @@ mgu.run({
         ui.onVisible(function(name, visible) {
             if (name === 'MAIN' && visible) render();
             if (name === 'NOW' && visible) renderNowPlaying();
+            if (name === 'TRASH' && visible) renderTrash();
         });
 
         // Do not perform a synchronous recursive USB scan during process startup:
         // on large drives this can block OAP before the first frame is displayed.
         await render();
-        log.info('USB Music Manager 0.1.12 started; waiting for user scan request');
+        log.info('USB Music Manager 0.1.13 started; waiting for user scan request');
     }
 });
