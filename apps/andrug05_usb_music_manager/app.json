@@ -1,8 +1,8 @@
 {
   "id": "andrug05_usb_music_manager",
   "title": "USB Music Manager",
-  "description": "Read-only USB MP3 browser for BMW MGU ID7. Scans removable USB volumes and reads ID3 metadata.",
-  "version": "0.1.11",
+  "description": "USB MP3 browser for BMW MGU ID7 with read-only media-source diagnostics.",
+  "version": "0.1.12",
   "vendor": "Andrug05",
   "loggingId": "UMM1",
   "iconGlyph": "music",
@@ -42,8 +42,38 @@
         [
           "BTN_OPEN",
           "Open"
+        ],
+        [
+          "BTN_NOW",
+          "Now Playing"
+        ]
+      ]
+    },
+    {
+      "name": "NOW",
+      "kind": "canvas",
+      "title": "Now Playing",
+      "buttons": [
+        [
+          "BTN_NOW_REFRESH",
+          "Refresh"
+        ],
+        [
+          "BTN_NOW_BACK",
+          "Back"
         ]
       ]
     }
-  ]
+  ],
+  "signals": {
+    "org.genivi.am.commandinterface.CommandControl": {
+      "_instances": "1",
+      "_methods": [
+        "getListMainSources",
+        "getListMainSinks",
+        "getListMainConnections"
+      ],
+      "_optional": "Read-only AudioManager query for detecting the active media source."
+    }
+  }
 }
