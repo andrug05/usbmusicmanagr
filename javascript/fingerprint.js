@@ -4,7 +4,7 @@ var child = require('child_process');
 var https = require('https');
 var querystring = require('querystring');
 
-var CLIENT_KEY = 'FW1zGtkoNj';
+var CLIENT_KEY = 'tyChHjKpvr';
 var FPCALC_PATHS = ['/usr/bin/fpcalc', '/usr/local/bin/fpcalc', '/opt/bin/fpcalc', 'fpcalc'];
 
 function runFpcalc(file) {
