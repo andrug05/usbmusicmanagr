@@ -1,7 +1,7 @@
 {
   "name": "oap-usb-music-manager",
-  "version": "0.1.13",
-  "description": "USB music library manager with reversible trash for BMW MGU ID7",
+  "version": "0.1.14",
+  "description": "USB music manager with ID3 editing and reversible trash for BMW MGU ID7",
   "main": "javascript/runner.js",
   "productName": "USB Music Manager",
   "author": "AndruG05",
