@@ -3,6 +3,7 @@
 const mgu = require('./kit/mgu');
 const scanner = require('./scanner');
 const filemanager = require('./filemanager');
+const tagwriter = require('./tagwriter');
 
 const W = 1600;
 const H = 520;
@@ -39,6 +40,12 @@ mgu.run({
         let trashMount = '';
         let trashSelected = 0;
         let trashStatus = 'Корзина USB';
+        let editTrack = null;
+        let editMount = '';
+        let editFields = [];
+        let editField = 0;
+        let editLayout = 'RU';
+        let editStatus = '';
         const sortModes = [
             {label:'Путь', field:'path'},
             {label:'Название', field:'title'},
@@ -169,6 +176,106 @@ mgu.run({
             }
         }
 
+        const tagFieldDefs = [
+            {key:'title', label:'Название'},
+            {key:'artist', label:'Исполнитель'},
+            {key:'album', label:'Альбом'},
+            {key:'track', label:'Номер трека'},
+            {key:'year', label:'Год'},
+            {key:'genre', label:'Жанр'}
+        ];
+        const keyboardLayouts = {
+            RU: ['йцукенгшщзх', 'фывапролджэ', 'ячсмитьбю'],
+            EN: ['qwertyuiop', 'asdfghjkl', 'zxcvbnm']
+        };
+        function openTagEditor() {
+            if (viewMode !== 0 || !currentTracks()[selected]) { status = 'Выберите трек в режиме Tracks'; render(); return; }
+            editTrack = currentTracks()[selected];
+            editMount = editTrack.mount || (volumes[0] && volumes[0].volume && volumes[0].volume.mount) || '';
+            if (!editMount) { status = 'Не удалось определить USB'; render(); return; }
+            const readOnly = volumes.some(function(v) { return v.volume && v.volume.mount === editMount && v.volume.readOnly; });
+            if (readOnly) { status = 'USB смонтирован только для чтения'; render(); return; }
+            editFields = tagFieldDefs.map(function(f) { return String(editTrack[f.key] || ''); });
+            editField = 0;
+            editStatus = 'Выберите поле и вводите текст клавишами на экране';
+            ui.open('EDIT').then(renderTagEditor);
+        }
+        async function renderTagEditor() {
+            const cv = ctx.canvas(W, H).clear(BG);
+            cv.roundRect(18, 12, W - 36, H - 24, 16, PANEL);
+            cv.text('РЕДАКТОР ID3', 48, 48, 25, BLUE, {font:'label', literal:true});
+            cv.text(safeText(editTrack ? editTrack.name : '', 80), 48, 76, 15, MUTED, {font:'label', literal:true});
+            tagFieldDefs.forEach(function(f, i) {
+                const y = 112 + i * 29;
+                const active = i === editField;
+                cv.roundRect(42, y - 20, 1510, 25, 5, active ? '#17496a' : '#172431');
+                cv.text(f.label, 58, y, 16, active ? BLUE : MUTED, {font:'label', literal:true});
+                cv.text(safeText(editFields[i] || '—', 90), 330, y, 17, TEXT, {font:'label', literal:true});
+            });
+            cv.text('Клавиатура: ' + editLayout + '   ·   Поле: ' + tagFieldDefs[editField].label, 48, 306, 15, YELLOW, {font:'label', literal:true});
+            const rows = keyboardLayouts[editLayout];
+            rows.forEach(function(row, ri) {
+                const keyW = 78, gap = 8;
+                const total = row.length * keyW + (row.length - 1) * gap;
+                const startX = (W - total) / 2;
+                for (let i = 0; i < row.length; i++) {
+                    const x = startX + i * (keyW + gap);
+                    const y = 338 + ri * 47;
+                    cv.roundRect(x, y - 25, keyW, 37, 6, '#26384a');
+                    cv.text(row.charAt(i), x + keyW / 2, y, 20, TEXT, {font:'label', literal:true, align:'center'});
+                }
+            });
+            cv.text('SPACE', 510, 484, 15, TEXT, {font:'label', literal:true});
+            cv.text('⌫', 650, 484, 18, TEXT, {font:'label', literal:true});
+            cv.text('CLEAR', 790, 484, 15, TEXT, {font:'label', literal:true});
+            cv.text('123 / . - _', 920, 484, 15, TEXT, {font:'label', literal:true});
+            cv.text(editStatus, 48, 510, 13, MUTED, {font:'label', literal:true});
+            await ui.image('EDIT_GFX', cv);
+        }
+        async function saveTagEditor() {
+            if (!editTrack || !editMount) return;
+            try {
+                const values = {};
+                tagFieldDefs.forEach(function(f, i) { values[f.key] = editFields[i]; });
+                const result = tagwriter.writeTags(editTrack.path, editMount, values);
+                Object.keys(values).forEach(function(k) { editTrack[k] = values[k]; });
+                editTrack.size = result.size;
+                editStatus = 'Сохранено. Резервная копия: .umm_tag_backup';
+                status = 'ID3-теги сохранены; копия исходного MP3 создана';
+                log.info('ID3 tags saved: ' + editTrack.path + ' backup=' + result.backup);
+                buildBrowseItems();
+                await renderTagEditor();
+            } catch (error) {
+                editStatus = 'Ошибка: ' + safeText(error.message || error, 100);
+                log.error('ID3 write failed: ' + (error.stack || error));
+                await renderTagEditor();
+            }
+        }
+        function handleEditorTap(x, y) {
+            if (!editTrack || typeof x !== 'number' || typeof y !== 'number') return;
+            if (y >= 90 && y < 270) {
+                const idx = Math.floor((y - 92) / 29);
+                if (idx >= 0 && idx < tagFieldDefs.length) editField = idx;
+            } else if (y >= 315 && y < 470) {
+                const ri = Math.floor((y - 315) / 47);
+                const row = keyboardLayouts[editLayout][ri];
+                if (row) {
+                    const keyW = 78, gap = 8;
+                    const total = row.length * keyW + (row.length - 1) * gap;
+                    const startX = (W - total) / 2;
+                    const ci = Math.floor((x - startX) / (keyW + gap));
+                    if (ci >= 0 && ci < row.length && x <= startX + ci * (keyW + gap) + keyW) {
+                        if (editFields[editField].length < 100) editFields[editField] += row.charAt(ci);
+                    }
+                }
+            } else if (y >= 465) {
+                if (x >= 470 && x < 620) editFields[editField] += ' ';
+                else if (x >= 620 && x < 760) editFields[editField] = editFields[editField].slice(0, -1);
+                else if (x >= 760 && x < 900) editFields[editField] = '';
+                else if (x >= 900) editLayout = editLayout === 'RU' ? 'EN' : 'RU';
+            }
+            renderTagEditor();
+        }
         async function renderTrash() {
             const cv = ctx.canvas(W, H).clear(BG);
             cv.roundRect(18, 12, W - 36, H - 24, 16, PANEL);
@@ -320,7 +427,7 @@ mgu.run({
                 cv.text(safeText(t.path || '', 68), 995, 438, 13, MUTED, {font:'label', literal:true});
             }
 
-            cv.text('READ ONLY  ·  MP3 ONLY  ·  NO FILE CHANGES', 48, 490, 13, MUTED, {font:'label', literal:true});
+            cv.text('MP3 ONLY  ·  ID3 EDITOR CREATES BACKUP  ·  USB TRASH', 48, 490, 13, MUTED, {font:'label', literal:true});
             await ui.image('MAIN_GFX', cv);
         }
 
@@ -380,6 +487,10 @@ mgu.run({
         ui.onClick('BTN_SCAN', scan);
         ui.onClick('BTN_NOW', function() { ui.open('NOW').then(refreshNowPlaying); });
         ui.onClick('BTN_DELETE', moveSelectedToTrash);
+        ui.onClick('BTN_EDIT', openTagEditor);
+        ui.onClick('BTN_EDIT_SAVE', saveTagEditor);
+        ui.onClick('BTN_EDIT_BACK', function() { ui.open('MAIN'); });
+        ctx.onTap(function(x, y) { if (ui.isVisible('EDIT')) handleEditorTap(x, y); });
         ui.onClick('BTN_TRASH', function() {
             const mount = volumes[0] && volumes[0].volume && volumes[0].volume.mount;
             ui.open('TRASH').then(function() { return loadTrash(mount); }).then(renderTrash);
@@ -432,11 +543,12 @@ mgu.run({
             if (name === 'MAIN' && visible) render();
             if (name === 'NOW' && visible) renderNowPlaying();
             if (name === 'TRASH' && visible) renderTrash();
+            if (name === 'EDIT' && visible) renderTagEditor();
         });
 
         // Do not perform a synchronous recursive USB scan during process startup:
         // on large drives this can block OAP before the first frame is displayed.
         await render();
-        log.info('USB Music Manager 0.1.13 started; waiting for user scan request');
+        log.info('USB Music Manager 0.1.14 started; waiting for user scan request');
     }
 });
