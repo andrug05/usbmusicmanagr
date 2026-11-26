@@ -2,7 +2,7 @@
   "id": "andrug05_usb_music_manager",
   "title": "USB Music Manager",
   "description": "USB MP3 browser for BMW MGU ID7 with read-only media-source diagnostics.",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "vendor": "Andrug05",
   "loggingId": "UMM1",
   "iconGlyph": "music",
@@ -54,6 +54,10 @@
         [
           "BTN_TRASH",
           "Trash"
+        ],
+        [
+          "BTN_EDIT",
+          "Edit Tags"
         ]
       ]
     },
@@ -91,6 +95,21 @@
         ],
         [
           "BTN_TRASH_BACK",
+          "Back"
+        ]
+      ]
+    },
+    {
+      "name": "EDIT",
+      "kind": "canvas",
+      "title": "ID3 Editor",
+      "buttons": [
+        [
+          "BTN_EDIT_SAVE",
+          "Save Tags"
+        ],
+        [
+          "BTN_EDIT_BACK",
           "Back"
         ]
       ]
