@@ -4,6 +4,7 @@ const mgu = require('./kit/mgu');
 const scanner = require('./scanner');
 const filemanager = require('./filemanager');
 const tagwriter = require('./tagwriter');
+const fingerprint = require('./fingerprint');
 
 const W = 1600;
 const H = 520;
@@ -46,6 +47,10 @@ mgu.run({
         let editField = 0;
         let editLayout = 'RU';
         let editStatus = '';
+        let autoTrack = null;
+        let autoCandidate = null;
+        let autoStatus = 'Выберите трек и нажмите «Распознать»';
+        let autoBusy = false;
         const sortModes = [
             {label:'Путь', field:'path'},
             {label:'Название', field:'title'},
@@ -276,6 +281,105 @@ mgu.run({
             }
             renderTagEditor();
         }
+
+        function openAutoTags() {
+            if (viewMode !== 0 || !currentTracks()[selected]) {
+                status = 'Для распознавания выберите трек в режиме Tracks';
+                render();
+                return;
+            }
+            autoTrack = currentTracks()[selected];
+            autoCandidate = null;
+            autoStatus = 'Готово к распознаванию';
+            ui.open('AUTO').then(renderAutoTags);
+        }
+        async function renderAutoTags() {
+            const cv = ctx.canvas(W, H).clear(BG);
+            cv.roundRect(18, 12, W - 36, H - 24, 16, PANEL);
+            cv.text('АВТОЗАПОЛНЕНИЕ ТЕГОВ · ACOUSTID', 48, 52, 25, BLUE, {font:'label', literal:true});
+            cv.text(safeText(autoTrack ? autoTrack.name : 'Трек не выбран', 100), 48, 88, 17, TEXT, {font:'label', literal:true});
+            cv.text(autoStatus, 48, 130, 18, autoBusy ? YELLOW : MUTED, {font:'label', literal:true});
+            if (autoBusy) {
+                cv.text('Создаю акустический отпечаток и ищу совпадение…', 60, 205, 22, YELLOW, {font:'label', literal:true});
+            } else if (autoCandidate) {
+                cv.text('НАЙДЕНОЕ СОВПАДЕНИЕ', 60, 190, 17, GREEN, {font:'label', literal:true});
+                cv.text('Название: ' + safeText(autoCandidate.title || '—', 75), 60, 235, 21, TEXT, {font:'label', literal:true});
+                cv.text('Исполнитель: ' + safeText(autoCandidate.artist || '—', 75), 60, 275, 19, TEXT, {font:'label', literal:true});
+                cv.text('Альбом: ' + safeText(autoCandidate.album || '—', 75), 60, 315, 19, TEXT, {font:'label', literal:true});
+                cv.text('Год: ' + safeText(autoCandidate.year || '—', 12) + '   ·   Совпадение: ' + Math.round(autoCandidate.score * 100) + '%', 60, 355, 19, YELLOW, {font:'label', literal:true});
+                cv.text('Проверьте результат. Теги будут записаны только после Apply.', 60, 420, 17, MUTED, {font:'label', literal:true});
+            } else {
+                cv.text('Распознавание использует fpcalc + AcoustID / MusicBrainz.', 60, 205, 19, MUTED, {font:'label', literal:true});
+                cv.text('Нужен интернет и установленный fpcalc на MGU.', 60, 245, 17, MUTED, {font:'label', literal:true});
+                cv.text('Файл не отправляется в интернет: передаётся только отпечаток.', 60, 285, 17, GREEN, {font:'label', literal:true});
+            }
+            cv.text('Запись создаёт резервную копию в .umm_tag_backup.', 60, 475, 15, MUTED, {font:'label', literal:true});
+            await ui.image('AUTO_GFX', cv);
+        }
+        async function identifyAutoTrack() {
+            if (autoBusy || !autoTrack) return;
+            autoBusy = true;
+            autoCandidate = null;
+            autoStatus = 'Распознавание…';
+            await renderAutoTags();
+            try {
+                autoCandidate = await fingerprint.identify(autoTrack.path);
+                autoStatus = autoCandidate.score >= 0.9 ? 'Высокая уверенность — проверьте и примените' :
+                    (autoCandidate.score >= 0.7 ? 'Средняя уверенность — обязательно проверьте' : 'Низкая уверенность — проверьте вручную');
+                log.info('AcoustID match: ' + autoTrack.path + ' score=' + autoCandidate.score + ' recording=' + autoCandidate.recordingId);
+            } catch (error) {
+                autoStatus = 'Не удалось распознать: ' + safeText(error.message || error, 130);
+                log.warn('AcoustID lookup failed: ' + (error.stack || error));
+            } finally {
+                autoBusy = false;
+                await renderAutoTags();
+            }
+        }
+        async function applyAutoTags() {
+            if (!autoTrack || !autoCandidate || autoBusy) return;
+            const mount = autoTrack.mount || (volumes[0] && volumes[0].volume && volumes[0].volume.mount) || '';
+            if (!mount) { autoStatus = 'Не удалось определить USB'; await renderAutoTags(); return; }
+            const readOnly = volumes.some(function(v) { return v.volume && v.volume.mount === mount && v.volume.readOnly; });
+            if (readOnly) { autoStatus = 'USB смонтирован только для чтения'; await renderAutoTags(); return; }
+            try {
+                const values = {
+                    title:autoCandidate.title || autoTrack.title || '',
+                    artist:autoCandidate.artist || autoTrack.artist || '',
+                    album:autoCandidate.album || autoTrack.album || '',
+                    track:autoCandidate.track || autoTrack.track || '',
+                    year:autoCandidate.year || autoTrack.year || '',
+                    genre:autoCandidate.genre || autoTrack.genre || ''
+                };
+                const result = tagwriter.writeTags(autoTrack.path, mount, values);
+                Object.keys(values).forEach(function(k) { autoTrack[k] = values[k]; });
+                autoTrack.size = result.size;
+                autoStatus = 'Теги сохранены. Резервная копия создана.';
+                status = 'Автотеги сохранены для ' + safeText(autoTrack.title, 45);
+                buildBrowseItems();
+                log.info('AcoustID tags saved: ' + autoTrack.path + ' backup=' + result.backup);
+            } catch (error) {
+                autoStatus = 'Ошибка записи: ' + safeText(error.message || error, 120);
+                log.error('AcoustID tag write failed: ' + (error.stack || error));
+            }
+            await renderAutoTags();
+        }
+        function identifyNextAutoTrack() {
+            if (!tracks.length) return;
+            let start = tracks.indexOf(autoTrack);
+            for (let i = 1; i <= tracks.length; i++) {
+                const candidate = tracks[(Math.max(start, -1) + i) % tracks.length];
+                if (!candidate.artist || !candidate.album || !candidate.year) {
+                    autoTrack = candidate;
+                    autoCandidate = null;
+                    autoStatus = 'Следующий трек: нажмите «Identify»';
+                    renderAutoTags();
+                    return;
+                }
+            }
+            autoStatus = 'У всех треков уже заполнены основные теги';
+            renderAutoTags();
+        }
+
         async function renderTrash() {
             const cv = ctx.canvas(W, H).clear(BG);
             cv.roundRect(18, 12, W - 36, H - 24, 16, PANEL);
@@ -488,6 +592,11 @@ mgu.run({
         ui.onClick('BTN_NOW', function() { ui.open('NOW').then(refreshNowPlaying); });
         ui.onClick('BTN_DELETE', moveSelectedToTrash);
         ui.onClick('BTN_EDIT', openTagEditor);
+        ui.onClick('BTN_AUTO', openAutoTags);
+        ui.onClick('BTN_AUTO_IDENTIFY', identifyAutoTrack);
+        ui.onClick('BTN_AUTO_APPLY', applyAutoTags);
+        ui.onClick('BTN_AUTO_NEXT', identifyNextAutoTrack);
+        ui.onClick('BTN_AUTO_BACK', function() { ui.open('MAIN'); });
         ui.onClick('BTN_EDIT_SAVE', saveTagEditor);
         ui.onClick('BTN_EDIT_BACK', function() { ui.open('MAIN'); });
         ctx.onTap(function(x, y) { if (ui.isVisible('EDIT')) handleEditorTap(x, y); });
@@ -544,11 +653,12 @@ mgu.run({
             if (name === 'NOW' && visible) renderNowPlaying();
             if (name === 'TRASH' && visible) renderTrash();
             if (name === 'EDIT' && visible) renderTagEditor();
+            if (name === 'AUTO' && visible) renderAutoTags();
         });
 
         // Do not perform a synchronous recursive USB scan during process startup:
         // on large drives this can block OAP before the first frame is displayed.
         await render();
-        log.info('USB Music Manager 0.1.14 started; waiting for user scan request');
+        log.info('USB Music Manager 0.1.15 started; waiting for user scan request');
     }
 });
