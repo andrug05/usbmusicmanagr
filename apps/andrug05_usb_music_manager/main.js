@@ -26,6 +26,10 @@ mgu.run({
         let status = 'Подключите USB и нажмите «Scan USB»';
         let scannedAt = '';
         let sortMode = 0;
+        let viewMode = 0;
+        let activeFilter = null;
+        const viewModes = ['Треки', 'Исполнители', 'Альбомы', 'Папки'];
+        let browseItems = [];
         const sortModes = [
             {label:'Путь', field:'path'},
             {label:'Название', field:'title'},
@@ -46,6 +50,42 @@ mgu.run({
             });
         }
 
+        function buildBrowseItems() {
+            const map = Object.create(null);
+            const mode = viewModes[viewMode];
+            tracks.forEach(function(t) {
+                let key = '';
+                if (mode === 'Исполнители') key = t.artist || 'Unknown artist';
+                else if (mode === 'Альбомы') key = (t.artist || 'Unknown artist') + ' — ' + (t.album || 'Unknown album');
+                else if (mode === 'Папки') {
+                    const p = String(t.path || '');
+                    const root = String(t.mount || '');
+                    key = p.indexOf(root) === 0 ? p.slice(root.length).replace(/^\\/+/, '').split('/').slice(0, -1).join('/') : '';
+                    key = key || '/';
+                }
+                if (!key) return;
+                if (!map[key]) map[key] = {label:key, count:0, artist:t.artist || '', album:t.album || '', folder:key};
+                map[key].count++;
+            });
+            browseItems = Object.keys(map).sort(function(a,b) {
+                return a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0;
+            }).map(function(k) { return map[k]; });
+        }
+
+        function currentTracks() {
+            if (!activeFilter) return tracks;
+            return tracks.filter(function(t) {
+                if (activeFilter.type === 'Исполнители') return (t.artist || 'Unknown artist') === activeFilter.value;
+                if (activeFilter.type === 'Альбомы') return (t.artist || 'Unknown artist') + ' — ' + (t.album || 'Unknown album') === activeFilter.value;
+                if (activeFilter.type === 'Папки') {
+                    const p = String(t.path || ''), root = String(t.mount || '');
+                    const folder = p.indexOf(root) === 0 ? p.slice(root.length).replace(/^\\/+/, '').split('/').slice(0, -1).join('/') : '';
+                    return (folder || '/') === activeFilter.value;
+                }
+                return true;
+            });
+        }
+
         function safeText(value, max) {
             let s = String(value == null ? '' : value);
             if (s.length > max) s = s.slice(0, max - 1) + '…';
@@ -58,30 +98,40 @@ mgu.run({
             cv.text('USB MUSIC MANAGER', 48, 52, 25, BLUE, {font:'label', literal:true});
             cv.text(status, 48, 83, 17, busy ? YELLOW : (tracks.length ? GREEN : MUTED), {font:'label', literal:true});
             cv.text('USB: ' + volumes.length + '   MP3: ' + tracks.length, W - 48, 52, 19, TEXT, {font:'label', literal:true, align:'right'});
-            if (scannedAt) cv.text('Scan: ' + scannedAt, W - 48, 82, 14, MUTED, {font:'label', literal:true, align:'right'});
+            if (scannedAt) cv.text('Scan: ' + scannedAt, W - 48, 82, 14, MUTED, {font:'label', literal:true});
 
-            const start = Math.max(0, Math.min(Math.max(0, tracks.length - PAGE_ROWS), selected - Math.floor(PAGE_ROWS / 2)));
-            const end = Math.min(tracks.length, start + PAGE_ROWS);
-            cv.text('TRACKS · SORT: ' + sortModes[sortMode].label.toUpperCase(), 48, 125, 15, MUTED, {font:'label', literal:true});
+            const isTracks = viewMode === 0;
+            const list = isTracks ? currentTracks() : browseItems;
+            const start = Math.max(0, Math.min(Math.max(0, list.length - PAGE_ROWS), selected - Math.floor(PAGE_ROWS / 2)));
+            const end = Math.min(list.length, start + PAGE_ROWS);
+            const heading = isTracks ? 'TRACKS' : viewModes[viewMode].toUpperCase();
+            cv.text(heading + (activeFilter ? ' · ' + safeText(activeFilter.value, 42) : '') +
+                (isTracks ? ' · SORT: ' + sortModes[sortMode].label.toUpperCase() : ''), 48, 125, 15, MUTED, {font:'label', literal:true});
             for (let i = start; i < end; i++) {
-                const t = tracks[i];
+                const item = list[i];
                 const y = 145 + (i - start) * 47;
                 const active = i === selected;
-                cv.roundRect(38, y - 25, details ? 900 : 1480, 40, 7, active ? '#17496a' : '#172431');
+                cv.roundRect(38, y - 25, details && isTracks ? 900 : 1480, 40, 7, active ? '#17496a' : '#172431');
                 cv.text(String(i + 1).padStart(4, '0'), 55, y, 15, active ? BLUE : MUTED, {font:'label', literal:true});
-                cv.text(safeText(t.title || t.name, 66), 120, y, 19, active ? TEXT : '#c6d2de', {font:'label', literal:true});
-                cv.text(safeText(t.artist || 'Unknown artist', 35), 820, y, 15, MUTED, {font:'label', literal:true});
-                cv.text(safeText(t.album || '', 32), 1120, y, 15, MUTED, {font:'label', literal:true});
-                cv.text((i + 1) + '/' + tracks.length, 1500, y, 14, MUTED, {font:'label', literal:true, align:'right'});
+                if (isTracks) {
+                    const t = item;
+                    cv.text(safeText(t.title || t.name, 66), 120, y, 19, active ? TEXT : '#c6d2de', {font:'label', literal:true});
+                    cv.text(safeText(t.artist || 'Unknown artist', 35), 820, y, 15, MUTED, {font:'label', literal:true});
+                    cv.text(safeText(t.album || '', 32), 1120, y, 15, MUTED, {font:'label', literal:true});
+                } else {
+                    cv.text(safeText(item.label, 78), 120, y, 19, active ? TEXT : '#c6d2de', {font:'label', literal:true});
+                    cv.text('Треков: ' + item.count, 820, y, 15, MUTED, {font:'label', literal:true});
+                }
+                cv.text((i + 1) + '/' + list.length, 1500, y, 14, MUTED, {font:'label', literal:true, align:'right'});
             }
 
-            if (!tracks.length && !busy) {
-                cv.text('Нажмите Scan USB для поиска музыкальных файлов', 60, 220, 22, MUTED, {font:'label', literal:true});
+            if (!list.length && !busy) {
+                cv.text(tracks.length ? 'В этом разделе пока нет записей' : 'Нажмите Scan USB для поиска музыкальных файлов', 60, 220, 22, MUTED, {font:'label', literal:true});
                 cv.text('Поддерживаются MP3. Файлы на USB не изменяются.', 60, 260, 17, MUTED, {font:'label', literal:true});
             }
 
-            if (details && tracks[selected]) {
-                const t = tracks[selected];
+            if (details && isTracks && list[selected]) {
+                const t = list[selected];
                 cv.roundRect(970, 116, 580, 350, 12, '#0c141d');
                 cv.text('TRACK DETAILS', 995, 150, 16, BLUE, {font:'label', literal:true});
                 cv.text(safeText(t.title || t.name, 45), 995, 190, 20, TEXT, {font:'label', literal:true});
@@ -130,7 +180,10 @@ mgu.run({
                     });
                 });
                 sortTracks();
+                viewMode = 0;
+                activeFilter = null;
                 selected = 0;
+                buildBrowseItems();
                 scannedAt = new Date().toLocaleTimeString();
                 const truncated = volumes.some(function(v) { return v.truncated; });
                 status = truncated
@@ -150,17 +203,37 @@ mgu.run({
 
         ui.onClick('BTN_SCAN', scan);
         ui.onClick('BTN_PREV', function() {
-            if (tracks.length) selected = (selected - 1 + tracks.length) % tracks.length;
+            const count = viewMode === 0 ? currentTracks().length : browseItems.length;
+            if (count) selected = (selected - 1 + count) % count;
             render();
         });
         ui.onClick('BTN_NEXT', function() {
-            if (tracks.length) selected = (selected + 1) % tracks.length;
+            const count = viewMode === 0 ? currentTracks().length : browseItems.length;
+            if (count) selected = (selected + 1) % count;
+            render();
+        });
+        ui.onClick('BTN_VIEW', function() {
+            viewMode = (viewMode + 1) % viewModes.length;
+            activeFilter = null;
+            details = false;
+            selected = 0;
+            buildBrowseItems();
+            render();
+        });
+        ui.onClick('BTN_OPEN', function() {
+            if (viewMode === 0 || !browseItems[selected]) return;
+            const item = browseItems[selected];
+            activeFilter = {type:viewModes[viewMode], value:item.label};
+            viewMode = 0;
+            selected = 0;
+            details = false;
             render();
         });
         ui.onClick('BTN_SORT', function() {
             sortMode = (sortMode + 1) % sortModes.length;
             sortTracks();
             selected = 0;
+            buildBrowseItems();
             render();
         });
         ui.onClick('BTN_INFO', function() {
