@@ -1,7 +1,7 @@
 {
   "id": "andrug05_usb_music_manager",
   "name": "USB Music Manager",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "USB MP3 browser with read-only MGU media-source diagnostics",
   "main": "index.html"
 }
