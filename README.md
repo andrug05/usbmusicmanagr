@@ -49,3 +49,8 @@ For legacy ID3 encoding-0 frames, UTF-8 is accepted only when it round-trips byt
 ## 0.1.11 library browsing
 
 Added grouped browsing by artist, album (artist + album) and folder. Select a group and press Open to show its tracks. View returns to the other library categories. USB access remains read-only.
+
+
+## 0.1.12 — Now Playing diagnostics
+
+Adds a separate **Now Playing** screen. It queries BMW's AudioManager read-only lists (sources, sinks and active connections) to identify which media source is routed to the front audio sink. It does not connect, disconnect, pause or control playback. Track title and artist are not claimed until the MGU's metadata interface is identified on the target head unit.
