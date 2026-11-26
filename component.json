@@ -1,7 +1,7 @@
 {
   "id": "andrug05_usb_music_manager",
   "kind": "app",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "name": "USB Music Manager",
   "description": "USB music browser and read-only media-source diagnostics for BMW MGU ID7",
   "entry": "index.html",
