@@ -15,7 +15,7 @@ on:
       version:
         description: 'Release version'
         required: true
-        default: '0.1.13'
+        default: '0.1.14'
 
 permissions:
   contents: write
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APP_ID: andrug05_usb_music_manager
-      APP_VERSION: ${{ inputs.version || '0.1.13' }}
+      APP_VERSION: ${{ inputs.version || '0.1.14' }}
     steps:
       - name: Checkout project
         uses: actions/checkout@v5
@@ -98,7 +98,7 @@ jobs:
           mkdir -p "upstream/apps/$APP_ID"
           cp "apps/$APP_ID/app.json" "upstream/apps/$APP_ID/app.json"
           cp "apps/$APP_ID/main.js" "upstream/apps/$APP_ID/main.js"
-          cp javascript/scanner.js javascript/id3.js javascript/filemanager.js "upstream/apps/$APP_ID/"
+          cp javascript/scanner.js javascript/id3.js javascript/filemanager.js javascript/tagwriter.js "upstream/apps/$APP_ID/"
 
           python3 - <<'PY'
           import json, os
@@ -131,6 +131,7 @@ jobs:
           node --check "upstream/apps/$APP_ID/scanner.js"
           node --check "upstream/apps/$APP_ID/id3.js"
           node --check "upstream/apps/$APP_ID/filemanager.js"
+          node --check "upstream/apps/$APP_ID/tagwriter.js"
           python3 - <<'PY'
           import json, os
           p = f"upstream/apps/{os.environ['APP_ID']}/app.json"
@@ -169,7 +170,7 @@ jobs:
               data = json.load(tf.extractfile(member))
               if data.get('oapAppSettings', {}).get('startUpGroups') != [909]:
                   raise SystemExit('USB supplementary group 909 missing')
-              for required in ('app.js', 'scanner.js', 'id3.js', 'filemanager.js', 'kit/mgu.js'):
+              for required in ('app.js', 'scanner.js', 'id3.js', 'filemanager.js', 'tagwriter.js', 'kit/mgu.js'):
                   if not any(n.endswith('/javascript/' + required) for n in names):
                       raise SystemExit(required + ' missing from package')
           with tarfile.open(f"release/{app}@{ver}.mgu", 'r:gz') as tf:
@@ -193,5 +194,5 @@ jobs:
             gh release create "$TAG" "release/$APP_ID@$APP_VERSION.mgu" "release/$APP_ID@$APP_VERSION.tgz" \
               --repo "$GITHUB_REPOSITORY" \
               --title "USB Music Manager $APP_VERSION" \
-              --notes "Standalone BMW MGU ID7 OAP app. Read-only MP3 scanner and ID3 metadata browser. First screen is rendered before USB scanning; USB supplementary group 909 is requested. MP3 deletion moves files into a reversible .umm_trash folder on the same USB; Restore moves them back without overwriting existing files. Built with the BMW MGU App Kit."
+              --notes "Standalone BMW MGU ID7 OAP app. Read-only MP3 scanner and ID3 metadata browser. First screen is rendered before USB scanning; USB supplementary group 909 is requested. MP3 deletion moves files into a reversible .umm_trash folder. ID3 editor writes title, artist, album, track, year and genre, preserving audio and embedding an original MP3 backup in .umm_tag_backup. Built with the BMW MGU App Kit."
           fi
