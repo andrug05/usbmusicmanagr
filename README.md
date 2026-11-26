@@ -12,10 +12,19 @@ Standalone read-only MP3 browser for BMW MGU ID7, built with the BMW MGU App Kit
 - Browses the library by artists, albums or folders using **View**, then opens a selected group with **Open**.
 - Detects embedded ID3 album artwork and reports whether a track contains a cover, without retaining image bytes in memory.
 - Requests supplementary group 909 (`mgu_usb`) for USB filesystem access.
+- Recognizes selected MP3 tracks by sound using local `fpcalc` (Chromaprint) and AcoustID / MusicBrainz.
+- Shows the candidate title, artist, album, year and match score before writing any metadata.
+- Creates a backup in `.umm_tag_backup` before applying automatically recognized tags.
 
-## Important: read-only
+## Automatic recognition requirements
 
-This release only reads files with the `.mp3` extension, does not follow symlinks, and never mounts/remounts, writes, renames, copies, moves, or deletes anything on the USB drive. Tag editing, copying and deletion are not included.
+Automatic recognition requires a working `fpcalc` executable on the MGU (searched in `/usr/bin/fpcalc`, `/usr/local/bin/fpcalc`, `/opt/bin/fpcalc`, then `PATH`) and an internet connection. The app computes the Chromaprint fingerprint locally; the MP3 audio itself is not uploaded. The fingerprint and duration are sent to AcoustID for matching against MusicBrainz metadata. Recognition does not guarantee a match, especially for live, remixed or poorly represented recordings.
+
+Use **Auto Tags** on a selected track, then **Identify**. Review the candidate and match score; **Apply Tags** is the only action that writes metadata. **Next Track** moves to the next track with incomplete basic tags so the user can repeat the review process. No automatic bulk writes occur. Every write uses the existing ID3 writer and creates an original-file backup in `.umm_tag_backup`.
+
+## File safety
+
+The scanner does not follow symlinks. Editing and moving a track to USB Trash write or move files only after an explicit user action. Trash is reversible; the ID3 editor and auto-tag writer preserve the audio stream and create a backup before replacing the MP3.
 
 ## Build and release
 
@@ -60,6 +69,10 @@ Adds a separate **Now Playing** screen. It queries BMW's AudioManager read-only 
 
 Adds **Move to Trash** for the selected MP3 and a separate **Trash** screen with Previous/Next and Restore. Files are moved to a hidden `.umm_trash` directory on the same USB drive (no permanent deletion). Restore returns a file to its original path and refuses to overwrite an existing file. Tag editing is not included in this build.
 
+
+## 0.1.15 — AcoustID automatic tag recognition
+
+Adds an Auto Tags screen. It invokes the MGU's installed `fpcalc` to create a Chromaprint fingerprint locally, queries AcoustID for MusicBrainz recording and release-group metadata, and displays the best candidate with a match score. The user must explicitly press Apply Tags; each write creates a backup in `.umm_tag_backup`. Next Track advances to the next track with incomplete metadata. No audio file is uploaded and no bulk changes are made automatically.
 
 ## 0.1.14 — ID3 tag editor
 
