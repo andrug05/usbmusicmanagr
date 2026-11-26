@@ -54,3 +54,8 @@ Added grouped browsing by artist, album (artist + album) and folder. Select a gr
 ## 0.1.12 — Now Playing diagnostics
 
 Adds a separate **Now Playing** screen. It queries BMW's AudioManager read-only lists (sources, sinks and active connections) to identify which media source is routed to the front audio sink. It does not connect, disconnect, pause or control playback. Track title and artist are not claimed until the MGU's metadata interface is identified on the target head unit.
+
+
+## 0.1.13 — USB trash
+
+Adds **Move to Trash** for the selected MP3 and a separate **Trash** screen with Previous/Next and Restore. Files are moved to a hidden `.umm_trash` directory on the same USB drive (no permanent deletion). Restore returns a file to its original path and refuses to overwrite an existing file. Tag editing is not included in this build.
