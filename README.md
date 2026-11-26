@@ -59,3 +59,8 @@ Adds a separate **Now Playing** screen. It queries BMW's AudioManager read-only 
 ## 0.1.13 — USB trash
 
 Adds **Move to Trash** for the selected MP3 and a separate **Trash** screen with Previous/Next and Restore. Files are moved to a hidden `.umm_trash` directory on the same USB drive (no permanent deletion). Restore returns a file to its original path and refuses to overwrite an existing file. Tag editing is not included in this build.
+
+
+## 0.1.14 — ID3 tag editor
+
+Adds a touch-screen editor for title, artist, album, track number, year and genre. Saving writes ID3v2.3 UTF-16 tags, preserves the MP3 audio stream and existing APIC artwork frames when supported, and stores the original MP3 in `.umm_tag_backup` on the same USB before replacing it. Includes Russian and English on-screen keyboard layouts. Reversible USB trash remains available.
