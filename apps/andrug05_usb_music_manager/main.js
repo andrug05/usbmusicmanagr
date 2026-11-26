@@ -18,6 +18,7 @@ mgu.run({
     async start(ctx) {
         const ui = ctx.ui;
         const log = ctx.log;
+        const signals = ctx.signals;
         let tracks = [];
         let volumes = [];
         let selected = 0;
@@ -30,6 +31,9 @@ mgu.run({
         let activeFilter = null;
         const viewModes = ['Треки', 'Исполнители', 'Альбомы', 'Папки'];
         let browseItems = [];
+        let nowSnapshot = null;
+        let nowError = '';
+        let nowBusy = false;
         const sortModes = [
             {label:'Путь', field:'path'},
             {label:'Название', field:'title'},
@@ -60,7 +64,7 @@ mgu.run({
                 else if (mode === 'Папки') {
                     const p = String(t.path || '');
                     const root = String(t.mount || '');
-                    key = p.indexOf(root) === 0 ? p.slice(root.length).replace(/^\\/+/, '').split('/').slice(0, -1).join('/') : '';
+                    key = p.indexOf(root) === 0 ? p.slice(root.length).replace(/^\/+/, '').split('/').slice(0, -1).join('/') : '';
                     key = key || '/';
                 }
                 if (!key) return;
@@ -79,7 +83,7 @@ mgu.run({
                 if (activeFilter.type === 'Альбомы') return (t.artist || 'Unknown artist') + ' — ' + (t.album || 'Unknown album') === activeFilter.value;
                 if (activeFilter.type === 'Папки') {
                     const p = String(t.path || ''), root = String(t.mount || '');
-                    const folder = p.indexOf(root) === 0 ? p.slice(root.length).replace(/^\\/+/, '').split('/').slice(0, -1).join('/') : '';
+                    const folder = p.indexOf(root) === 0 ? p.slice(root.length).replace(/^\/+/, '').split('/').slice(0, -1).join('/') : '';
                     return (folder || '/') === activeFilter.value;
                 }
                 return true;
@@ -90,6 +94,106 @@ mgu.run({
             let s = String(value == null ? '' : value);
             if (s.length > max) s = s.slice(0, max - 1) + '…';
             return s;
+        }
+
+        function asArray(value) {
+            if (Array.isArray(value)) return value;
+            if (value && typeof value === 'object') {
+                const keys = Object.keys(value);
+                for (let i = 0; i < keys.length; i++) {
+                    if (Array.isArray(value[keys[i]])) return value[keys[i]];
+                }
+            }
+            return [];
+        }
+
+        async function refreshNowPlaying() {
+            if (nowBusy) return;
+            nowBusy = true;
+            nowError = '';
+            await renderNowPlaying();
+            let proxy = null;
+            try {
+                proxy = await signals.proxy('org.genivi.am.commandinterface.CommandControl', '1');
+                await new Promise(function(resolve, reject) {
+                    let settled = false;
+                    const timer = setTimeout(function() {
+                        if (!settled) { settled = true; reject(new Error('AudioManager не отвечает')); }
+                    }, 6000);
+                    signals.onAvailable(proxy, function(available) {
+                        if (available && !settled) {
+                            settled = true;
+                            clearTimeout(timer);
+                            resolve();
+                        }
+                    }).catch(function(error) {
+                        if (!settled) { settled = true; clearTimeout(timer); reject(error); }
+                    });
+                });
+                const values = await Promise.all([
+                    signals.call(proxy, 'getListMainSources', {}, 5000),
+                    signals.call(proxy, 'getListMainSinks', {}, 5000),
+                    signals.call(proxy, 'getListMainConnections', {}, 5000)
+                ]);
+                nowSnapshot = {
+                    sources: asArray(values[0]),
+                    sinks: asArray(values[1]),
+                    connections: asArray(values[2]),
+                    checkedAt: new Date().toLocaleTimeString()
+                };
+                log.info('Media source probe: ' + JSON.stringify(nowSnapshot));
+            } catch (error) {
+                nowError = safeText(error && error.message ? error.message : error, 100);
+                log.warn('Media source probe failed: ' + nowError);
+            } finally {
+                nowBusy = false;
+                await renderNowPlaying();
+            }
+        }
+
+        async function renderNowPlaying() {
+            const cv = ctx.canvas(W, H).clear(BG);
+            cv.roundRect(18, 12, W - 36, H - 24, 16, PANEL);
+            cv.text('СЕЙЧАС ИГРАЕТ', 48, 52, 25, BLUE, {font:'label', literal:true});
+            cv.text('Проверка штатного медиаплеера MGU', 48, 83, 17, MUTED, {font:'label', literal:true});
+            if (nowBusy) {
+                cv.text('Запрашиваю список аудиоисточников…', 60, 160, 22, YELLOW, {font:'label', literal:true});
+            } else if (nowError) {
+                cv.text('Не удалось получить данные AudioManager', 60, 155, 21, YELLOW, {font:'label', literal:true});
+                cv.text(nowError, 60, 194, 16, MUTED, {font:'label', literal:true});
+            } else if (!nowSnapshot) {
+                cv.text('Нажмите «Обновить» для проверки источника воспроизведения', 60, 160, 20, MUTED, {font:'label', literal:true});
+            } else {
+                const sources = nowSnapshot.sources || [];
+                const sinks = nowSnapshot.sinks || [];
+                const connections = nowSnapshot.connections || [];
+                function byId(items, id, field) {
+                    for (let i = 0; i < items.length; i++) {
+                        if (String(items[i][field]) === String(id)) return items[i];
+                    }
+                    return null;
+                }
+                cv.text('Активные аудиосоединения: ' + connections.length, 60, 135, 19, TEXT, {font:'label', literal:true});
+                let y = 180;
+                connections.slice(0, 5).forEach(function(connection, index) {
+                    const source = byId(sources, connection.sourceID, 'sourceID');
+                    const sink = byId(sinks, connection.sinkID, 'sinkID');
+                    const sourceName = source && source.name ? source.name : ('source ' + connection.sourceID);
+                    const sinkName = sink && sink.name ? sink.name : ('sink ' + connection.sinkID);
+                    cv.text(safeText(sourceName + '  →  ' + sinkName, 90), 65, y, 19, GREEN, {font:'label', literal:true});
+                    cv.text('Состояние: ' + safeText(connection.connectionState || 'неизвестно', 28), 65, y + 25, 14, MUTED, {font:'label', literal:true});
+                    y += 62;
+                });
+                if (!connections.length) cv.text('Сейчас нет зарегистрированных аудиосоединений', 65, 180, 19, MUTED, {font:'label', literal:true});
+                const usbActive = connections.some(function(connection) {
+                    const source = byId(sources, connection.sourceID, 'sourceID');
+                    return source && /usb/i.test(String(source.name || ''));
+                });
+                cv.text(usbActive ? 'Обнаружен подключённый источник с названием USB' : 'Источник USB пока не удалось подтвердить', 60, 440, 18, usbActive ? GREEN : YELLOW, {font:'label', literal:true});
+                cv.text('Источников: ' + sources.length + '   Выходов: ' + sinks.length + '   Проверено: ' + nowSnapshot.checkedAt, 60, 475, 14, MUTED, {font:'label', literal:true});
+            }
+            cv.text('Название и исполнитель появятся после обнаружения интерфейса метаданных плеера', 60, 405, 16, MUTED, {font:'label', literal:true});
+            await ui.image('NOW_GFX', cv);
         }
 
         async function render() {
@@ -202,6 +306,9 @@ mgu.run({
         }
 
         ui.onClick('BTN_SCAN', scan);
+        ui.onClick('BTN_NOW', function() { ui.open('NOW').then(refreshNowPlaying); });
+        ui.onClick('BTN_NOW_REFRESH', refreshNowPlaying);
+        ui.onClick('BTN_NOW_BACK', function() { ui.open('MAIN'); });
         ui.onClick('BTN_PREV', function() {
             const count = viewMode === 0 ? currentTracks().length : browseItems.length;
             if (count) selected = (selected - 1 + count) % count;
@@ -242,11 +349,12 @@ mgu.run({
         });
         ui.onVisible(function(name, visible) {
             if (name === 'MAIN' && visible) render();
+            if (name === 'NOW' && visible) renderNowPlaying();
         });
 
         // Do not perform a synchronous recursive USB scan during process startup:
         // on large drives this can block OAP before the first frame is displayed.
         await render();
-        log.info('USB Music Manager 0.1.8 started; waiting for user scan request');
+        log.info('USB Music Manager 0.1.12 started; waiting for user scan request');
     }
 });
